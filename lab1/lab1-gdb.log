@@ -1,0 +1,62 @@
+pc             0x1000	0x1000
+=> 0x1000:	auipc	t0,0x0
+   0x1004:	addi	a2,t0,40
+   0x1008:	csrr	a0,mhartid
+   0x100c:	ld	a1,32(t0)
+   0x1010:	ld	t0,24(t0)
+   0x1014:	jr	t0
+   0x1018:	unimp
+   0x101a:	.insn	2, 0x8000
+No symbol "info" in current context.
+0x0000000000001004 in ?? ()
+pc             0x1004	0x1004
+t0             0x1000	4096
+0x1018:	0x0000000080000000	0x0000000087e00000
+0x0000000000001014 in ?? ()
+pc             0x1014	0x1014
+t0             0x80000000	2147483648
+a0             0x0	0
+a1             0x87e00000	2279604224
+a2             0x1028	4136
+0x0000000080000000 in ?? ()
+pc             0x80000000	0x80000000
+   0x80200000 <kern_entry>:	auipc	sp,0x3
+   0x80200004 <kern_entry+4>:	mv	sp,sp
+   0x80200008 <kern_entry+8>:	j	0x8020000a <kern_init>
+   0x8020000a <kern_init>:	auipc	a0,0x3
+   0x8020000e <kern_init+4>:	addi	a0,a0,-2
+   0x80200012 <kern_init+8>:	auipc	a2,0x3
+Breakpoint 1 at 0x80200000: file kern/init/entry.S, line 7.
+Continuing.
+
+Breakpoint 1, kern_entry () at kern/init/entry.S:7
+7	    la sp, bootstacktop
+pc             0x80200000	0x80200000 <kern_entry>
+sp             0x80046eb0	0x80046eb0
+=> 0x80200000 <kern_entry>:	auipc	sp,0x3
+   0x80200004 <kern_entry+4>:	mv	sp,sp
+   0x80200008 <kern_entry+8>:	j	0x8020000a <kern_init>
+   0x8020000a <kern_init>:	auipc	a0,0x3
+   0x8020000e <kern_init+4>:	addi	a0,a0,-2
+   0x80200012 <kern_init+8>:	auipc	a2,0x3
+$1 = 0x80203000
+0x0000000080200004 in kern_entry () at kern/init/entry.S:7
+7	    la sp, bootstacktop
+pc             0x80200004	0x80200004 <kern_entry+4>
+sp             0x80203000	0x80203000 <SBI_CONSOLE_PUTCHAR>
+ra             0x8000ae9a	0x8000ae9a
+Undefined command: "0x80200008".  Try "help".
+9	    tail kern_init
+pc             0x80200008	0x80200008 <kern_entry+8>
+sp             0x80203000	0x80203000 <SBI_CONSOLE_PUTCHAR>
+ra             0x8000ae9a	0x8000ae9a
+kern_init () at kern/init/init.c:8
+8	    memset(edata, 0, end - edata);
+pc             0x8020000a	0x8020000a <kern_init>
+sp             0x80203000	0x80203000 <SBI_CONSOLE_PUTCHAR>
+ra             0x8000ae9a	0x8000ae9a
+Continuing.
+
+Program received signal SIGINT, Interrupt.
+kern_init () at kern/init/init.c:12
+12	   while (1)
