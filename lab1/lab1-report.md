@@ -96,7 +96,7 @@ cprintf → vcprintf → vprintfmt
     → cputch → cons_putc → sbi_console_putchar → sbi_call → ecall
 ```
 
-`kern/libs/stdio.c` 处理可变参数并提供输出接口，`libs/printfmt.c` 解析格式并通过回调输出字符，`kern/driver/console.c` 封装单字符输出，`libs/sbi.c` 发起 SBI 调用。在本实验使用的传统 SBI 字符输出接口中，服务编号为 1，通过 a7 传递，字符通过 a0 传递。内核执行 ecall 后由机器模式的 OpenSBI 处理，再返回内核。这里使用的是项目自己的 stdio 实现，不依赖宿主 Ubuntu 的 glibc。
+`kern/libs/stdio.c` 处理可变参数并提供输出接口，`libs/printfmt.c` 解析格式并通过回调输出字符，`kern/driver/console.c` 封装单字符输出，`libs/sbi.c` 发起 SBI 调用。在本实验使用的传统 SBI 字符输出接口中，服务编号为 1，通过 a7 传递，字符通过 a0 传递。内核执行 ecall 后由机器模式的 OpenSBI 处理，再返回内核。
 ---
 
 ## 四、实验内容与实现
