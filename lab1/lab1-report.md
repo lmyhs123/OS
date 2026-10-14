@@ -287,6 +287,50 @@ Makefile 使用 -device loader 加载 bin/ucore.img。
 
 当前实验包虽然在 Makefile 中保留 grade 目标，但不包含 `tools/grade.sh`。本报告不声称通过 make grade，以实际启动和 GDB 证据验证要求的行为。
 
+### 补充问题：实验里看似由 OpenSBI 完成的“加载内核并启动”，究竟哪些步骤由 QEMU 做？换成真实开发板后由谁做？
+
+这里按“镜像加载、运行环境初始化、控制权交接、运行时服务”分别讨论，以区分模拟器的启动准备和固件实际执行的工作。
+
+#### 1. 本实验中的分工
+
+本实验采用 `qemu-system-riscv64 -machine virt -nographic -bios default -kernel bin/ucore.img`。QEMU 在宿主机上模拟 CPU、内存和设备，同时在虚拟 CPU 开始执行前，将默认 OpenSBI 固件和内核镜像写入客体物理内存。本次固件位置为 `0x80000000`，内核位置为 `0x80200000`。因此，“从宿主机读取 bin/ucore.img 并放入内存”是 QEMU 的加载工作，不能说成 OpenSBI 从磁盘读取了这个内核文件。
+
+QEMU 还构造复位 ROM 和启动信息。以 QEMU v8.2.0 的源码作为机制参考，`virt_machine_done()` 调用固件及内核加载函数，并通过 `riscv_setup_rom_reset_vec()` 设置复位代码；启动辅助代码将下一阶段地址与模式写入 `fw_dynamic_info`。复位代码通过 a0 传递 HART 编号、a1 传递设备树地址、a2 传递动态启动信息地址。这里引用该版本源码解释机制，不将它当成本实验未记录的精确 QEMU 版本。[QEMU virt 启动源码](https://github.com/qemu/qemu/blob/v8.2.0/hw/riscv/virt.c)、[RISC-V 启动辅助源码](https://github.com/qemu/qemu/blob/v8.2.0/hw/riscv/boot.c)
+
+虚拟 CPU 开始运行后，从 `0x1000` 的复位 ROM 跳转到 OpenSBI。OpenSBI 是独立的 RISC-V 固件程序，其指令由 QEMU 模拟的 CPU 执行。OpenSBI 根据平台完成机器模式运行环境初始化，包括适用的异常入口、保护与中断委派等配置，并按下一阶段信息将控制权交给 S 模式内核。内核运行之后，OpenSBI 继续保留，处理 SBI 请求；本实验的字符输出就是由内核通过 ecall 请求 OpenSBI，再访问 QEMU 模拟的串口设备。
+
+| 工作 | 本实验中主要由谁完成 |
+| --- | --- |
+| 模拟 CPU、内存、串口与定时器 | QEMU 的硬件模型 |
+| 将宿主机上的固件和内核文件放入客体内存 | QEMU 的加载代码 |
+| 构造复位 ROM、设备树和下一阶段信息 | QEMU 的机器与启动代码 |
+| 执行复位指令、准备寄存器并跳入固件 | 模拟 CPU 执行 QEMU 构造的 ROM 代码 |
+| 建立机器模式固件环境、准备进入下一阶段 | 模拟 CPU 执行 OpenSBI 代码 |
+| 切换到 S 模式并交给内核入口 | OpenSBI 的交接代码 |
+| 设置内核自己的栈、清零 BSS、调用 cprintf | uCore 内核代码 |
+| 处理 SBI 字符输出请求 | OpenSBI；底层 UART 硬件由 QEMU 模拟 |
+
+这也解释了此前的启动修复：通用 loader 将镜像放入内存，不等于已经向默认固件提供正确的下一阶段入口。改用 `-kernel` 后，QEMU 的内核启动流程正确提供该信息，OpenSBI 输出的 Next Address 从 0 变为 `0x80200000`，随后内核成功运行。OpenSBI 的 FW_DYNAMIC 文档明确说明，它从前一启动阶段接收下一阶段信息，结构地址通过 a2 传递。[OpenSBI FW_DYNAMIC 说明](https://github.com/riscv-software-src/opensbi/blob/master/docs/firmware/fw_dynamic.md)
+
+#### 2. 如果不用 QEMU，真实硬件上由谁完成这些工作？
+
+真实 CPU、RAM、UART 和定时器承担 QEMU 硬件模型所模拟的职责。CPU 复位后从平台规定的启动位置执行 Boot ROM 等早期代码，不能假设所有真实开发板也使用本实验的 `0x1000`。
+
+镜像进入内存的过程依赖开发板启动链。常见情况是 Boot ROM 加载早期引导程序，SPL 初始化 DRAM 并加载 OpenSBI 与后续引导程序，后者从 Flash、SD 卡或其他介质加载内核。一个常见 RISC-V 路线是：
+
+```text
+Boot ROM → U-Boot SPL（M 模式）
+         → OpenSBI（M 模式）
+         → U-Boot proper（S 模式，加载内核）
+         → 操作系统内核（S 模式）
+```
+
+这是启动方式之一，不是所有平台必须使用的唯一顺序。OpenSBI 也可直接进入已经加载的内核，或使用 FW_PAYLOAD 将后续程序打包进固件镜像；FW_JUMP 则使用约定的下一阶段地址。不能因为固件负责跳转，就推断固件一定具备从存储设备读取独立内核文件的功能。[U-Boot RISC-V 启动说明](https://docs.u-boot.org/en/latest/arch/riscv.html)、[OpenSBI 固件类型说明](https://github.com/riscv-software-src/opensbi/blob/master/docs/firmware/fw.md)
+
+如果在真实硬件上使用 OpenSBI，其机器模式初始化、SBI 服务和交接职责仍由 OpenSBI 承担，只是它在真实 CPU 上执行。如果选择不用 OpenSBI，则需由其他兼容 SBI 的固件或自行编写的机器模式程序承担相应职责；本实验内核使用 SBI 输出，不能只去掉固件而保持原启动和输出路径不变。
+
+因此，本问题的结论是：**QEMU 提供模拟硬件并简化镜像加载与启动准备；OpenSBI 在目标机器的机器模式下执行初始化、交接和 SBI 服务。真实硬件上，加载工作由具体平台的启动链接手，固件工作则仍由 OpenSBI 或其替代实现承担。**
+
 ### Challenge
 
 已阅读的 Lab1 练习页面未列出独立 Challenge，本报告不虚构额外完成项。
