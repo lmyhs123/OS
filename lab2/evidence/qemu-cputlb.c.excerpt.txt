@@ -3,12 +3,12 @@
 1662:     return true;
 1663: }
 1664: #endif
-1665: 
+1665:
 1666: /*
 1667:  * Probe for a load/store operation.
 1668:  * Return the host address and into @flags.
 1669:  */
-1670: 
+1670:
 1671: typedef struct MMULookupPageData {
 1672:     CPUTLBEntryFull *full;
 1673:     void *haddr;
@@ -16,13 +16,13 @@
 1675:     int flags;
 1676:     int size;
 1677: } MMULookupPageData;
-1678: 
+1678:
 1679: typedef struct MMULookupLocals {
 1680:     MMULookupPageData page[2];
 1681:     MemOp memop;
 1682:     int mmu_idx;
 1683: } MMULookupLocals;
-1684: 
+1684:
 1685: /**
 1686:  * mmu_lookup1: translate one page
 1687:  * @cpu: generic cpu state
@@ -46,7 +46,7 @@
 1705:     bool maybe_resized = false;
 1706:     CPUTLBEntryFull *full;
 1707:     int flags;
-1708: 
+1708:
 1709:     /* If the TLB entry is for a different page, reload and try again.  */
 1710:     if (!tlb_hit(tlb_addr, addr)) {
 1711:         if (!victim_tlb_hit(cpu, mmu_idx, index, access_type,
@@ -58,19 +58,19 @@
 1717:         }
 1718:         tlb_addr = tlb_read_idx(entry, access_type) & ~TLB_INVALID_MASK;
 1719:     }
-1720: 
+1720:
 1721:     full = &cpu->neg.tlb.d[mmu_idx].fulltlb[index];
 1722:     flags = tlb_addr & (TLB_FLAGS_MASK & ~TLB_FORCE_SLOW);
 1723:     flags |= full->slow_flags[access_type];
-1724: 
+1724:
 1725:     data->full = full;
 1726:     data->flags = flags;
 1727:     /* Compute haddr speculatively; depending on flags it might be invalid. */
 1728:     data->haddr = (void *)((uintptr_t)addr + entry->addend);
-1729: 
+1729:
 1730:     return maybe_resized;
 1731: }
-1732: 
+1732:
 1733: /**
 1734:  * mmu_watch_or_dirty
 1735:  * @cpu: generic cpu state
