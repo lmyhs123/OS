@@ -1,4 +1,4 @@
-% Generated from lab2-report.md; SHA256=e4a4b9346f13fbb6165f3f09534c1eda3a4d3c5220e02e7b28b98870b2f2e3a2
+% Generated from lab2-report.md; SHA256=a8fae69e66c523dc3223343b7ca3e15e4f263a85aeefe3682e0fcbd5f3b66f48
 % -*- coding: utf-8 -*-
 % 基于所提供的南开大学实验报告模板；编译器：XeLaTeX。
 % 保留提供模板的版心、封面字体、校徽、水印和页眉页脚；正文由Markdown生成。
@@ -144,6 +144,9 @@ QEMU 预装固件/镜像 → ROM → OpenSBI → entry.S
 \end{lstlisting}
 
 内核链接 VA 起点为 0xffffffffc0200000，加载 PA 为 0x80200000，偏移量为 0xffffffff40000000。VA=PA+offset；PADDR 进行反向转换。不要将 Page *、物理地址 PA、虚拟地址 VA 和物理页号 PPN 混为同一数值。
+
+
+目录迁移说明（2026-10-25）：实验目录现为 \nolinkurl{/home/lmy/os/lab2}，Lab1目录为 \nolinkurl{/home/lmy/os/lab1}。工具链和独立调试版QEMU位置保持不变。演示文档已改用新路径；历史日志保留采集时的路径。
 
 
 \section{实验内容与实现}

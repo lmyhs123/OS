@@ -1,0 +1,33 @@
+The target architecture is set to "riscv:rv64".
+0x0000000000001000 in ?? ()
+pc             0x1000	0x1000
+satp           0x0	0
+=> 0x1000:	auipc	t0,0x0
+   0x1004:	addi	a2,t0,40
+   0x1008:	csrr	a0,mhartid
+   0x100c:	ld	a1,32(t0)
+   0x1010:	ld	t0,24(t0)
+   0x1014:	jr	t0
+Hardware assisted breakpoint 1 at 0xffffffffc02000d6: file kern/init/init.c, line 31.
+
+Breakpoint 1, kern_init () at kern/init/init.c:31
+31	    memset(edata, 0, end - edata);
+pc             0xffffffffc02000d6	0xffffffffc02000d6 <kern_init>
+satp           0x8000000000080205	-9223372036854251003
+sp             0xffffffffc0205000	0xffffffffc0205000
+$1 = 0xffffffffc0205000
+$2 = 0x80205000
+$3 = 0xffffffffc02000d6
+$4 = 0x1ff
+0x80205ff8:	0x00000000200000cf
+0x80205010:	0x00000000200000cf
+=> 0xffffffffc02000d6 <kern_init>:	auipc	a0,0x6
+   0xffffffffc02000da <kern_init+4>:	addi	a0,a0,-190
+   0xffffffffc02000de <kern_init+8>:	auipc	a2,0x6
+   0xffffffffc02000e2 <kern_init+12>:	addi	a2,a2,-46
+   0xffffffffc02000e6 <kern_init+16>:	addi	sp,sp,-16
+   0xffffffffc02000e8 <kern_init+18>:	sub	a2,a2,a0
+0xffffffffc02000da	31	    memset(edata, 0, end - edata);
+pc             0xffffffffc02000da	0xffffffffc02000da <kern_init+4>
+[Inferior 1 (process 1) detached]
+

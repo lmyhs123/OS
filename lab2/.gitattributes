@@ -1,4 +1,4 @@
 * text=auto eol=lf
-*.log -text
+*.log -text -whitespace
 *.png binary
 *.pdf binary

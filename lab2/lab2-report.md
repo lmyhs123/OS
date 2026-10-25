@@ -31,6 +31,8 @@ QEMU 预装固件/镜像 → ROM → OpenSBI → entry.S
 
 内核链接 VA 起点为 0xffffffffc0200000，加载 PA 为 0x80200000，偏移量为 0xffffffff40000000。VA=PA+offset；PADDR 进行反向转换。不要将 Page *、物理地址 PA、虚拟地址 VA 和物理页号 PPN 混为同一数值。
 
+目录迁移说明（2026-10-25）：实验目录现为 `/home/lmy/os/lab2`，Lab1目录为 `/home/lmy/os/lab1`。工具链和独立调试版QEMU位置保持不变。演示文档已改用新路径；历史日志保留采集时的路径。
+
 ## 三、实验内容与实现
 
 ### 3.1 物理内存初始化 page_init

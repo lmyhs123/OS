@@ -15,6 +15,8 @@
 
 ## 构建
 
+当前虚拟机实验目录为`/home/lmy/os/lab2`，Lab1为`/home/lmy/os/lab1`。先执行`cd ~/os/lab2`，再执行以下命令。
+
 Ubuntu安装RISC-V裸机工具链、make、QEMU riscv64系统模拟器、OpenSBI、gdb-multiarch、python3和bc后：
 
 ```bash
