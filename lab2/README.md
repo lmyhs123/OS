@@ -1,32 +1,31 @@
 # Lab2：物理内存与页表
 
-成员：2413982 李珉熠（组长）、2411080 吴宇石、2413715 赵亚鑫。
+我们小组成员为李珉熠（2413982，组长）、吴宇石（2411080）和赵亚鑫（2413715）。我们基于课程框架完成了物理页初始化、Best-Fit、Buddy 和简化 SLUB，并调试了 QEMU 的地址翻译路径。
 
-- [原版Markdown实验报告](./lab2-report.md)
-- [南开模板PDF版](./report-template/lab2-report.pdf)
-- [南开模板LaTeX源码](./report-template/lab2-report.tex)
-- [全部术语词典](./docs/术语词典.md)
-- [演示命令与参数解释](./docs/演示命令.md)
-- [从零原理解释和助教追问](./docs/原理详解与答辩追问.md)
-- [助教实问专项：源码定位与逐行演示](./docs/助教实问专项逐行答辩.md)
-- [任务规格与辅助提示词](./prompts.md)
-- [课程评分输出](./evidence/grade.log)
-- [QEMU取指翻译记录](./evidence/host-console.log)
-- [QEMU数据读翻译记录](./evidence/host-data-console.log)
+## 实验报告
 
-## 构建
+- [Markdown 实验报告](./lab2-report.md)
+- [南开模板 PDF 报告](./report-template/lab2-report.pdf)
+- [南开模板 LaTeX 源码](./report-template/lab2-report.tex)
 
-当前虚拟机实验目录为`/home/lmy/os/lab2`，Lab1为`/home/lmy/os/lab1`。先执行`cd ~/os/lab2`，再执行以下命令。
+我们同步维护 Markdown 与模板版报告，正文包含小组分工、实现分析、测试结果、QEMU 分支任务和 AI 辅助记录。LaTeX 源码与同目录的校徽、水印资源可直接用于 XeLaTeX 编译。
 
-Ubuntu安装RISC-V裸机工具链、make、QEMU riscv64系统模拟器、OpenSBI、gdb-multiarch、python3和bc后：
+## 我们的实现
+
+我们在 `kern/mm` 中实现物理内存初始化和分配算法，在启动代码中补充低地址过渡映射，并修正构建与评分所需的兼容问题。我们保留了课程自带的 `basic_check`、`best_fit_check` 及评分测试源码，在其外增加独立检查。
+
+## 编译与验证
+
+我们的实验环境为 Ubuntu 24.04、RISC-V GCC 15.1.0、QEMU 8.2.2 和 OpenSBI 1.3；实验目录为 `/home/lmy/os/lab2`。我们使用以下命令构建和运行默认 Best-Fit 配置：
 
 ```bash
+cd ~/os/lab2
 export PATH=/home/lmy/riscv-elf-toolchains/bin:$PATH
 make -j4
 make qemu
 ```
 
-默认Best-Fit运行后会输出检查与SLUB PASS；Ctrl+A、松开按X退出。使用其他工具链时调整PATH或指定GCCPREFIX；Makefile默认GCCPREFIX为riscv64-unknown-elf-。
+运行后，我们用 Ctrl+A、松开后按 X 退出 QEMU，再执行评分及 Buddy 配置验证：
 
 ```bash
 make grade
@@ -35,24 +34,10 @@ make PMM=buddy -j4
 make PMM=buddy qemu
 ```
 
-Buddy结束后恢复默认前先make clean再make。切换编译选项不应复用旧目标文件。
+切回默认配置时，我们先执行 `make clean`，再执行 `make`。课程初始化与 Best-Fit 评分实测为 20/20，Buddy 和 SLUB 独立检查通过；详细范围与结果见报告。
 
-课程page_init与Best-Fit评分实测20/20；Buddy与SLUB的独立测试也运行通过，详见报告。测试使用当前128MiB默认配置，另有64/256MiB边界运行记录。不包含生产级并发或完整Linux SLUB。
+## 调试验证
 
-## QEMU分支任务
+我们在一个终端执行 `make debug` 启动暂停的 QEMU，在另一个终端进入同一目录执行 `make gdb` 连接内核。QEMU 源码调试另使用我们独立构建的带符号版本；报告记录了 SATP、PTE、取指和数据读取的实际翻译结果。
 
-系统QEMU不替换。带符号QEMU在实验虚拟机的`/home/lmy/oslab-tools/qemu-ubuntu-build/`。其他机器可参考`tools/build-debug-qemu.sh`构建，宿主需有GCC、glib2开发库、zlib开发库、Python venv等构建依赖。源码来自Ubuntu的QEMU 8.2.2重打包源代码，未上传庞大源码和二进制；摘录及GPL许可证保存在evidence，完整来源链接在报告中。
-
-```bash
-python3 tools/verify_guest.py
-python3 tools/verify_host.py
-python3 tools/verify_host.py boot_dtb
-```
-
-这些命令已经在本实验虚拟机运行验证。客体自动验证用1235端口，两层自动验证用1236，手工演示用1234；避免同端口启动多个实例。宿主脚本在HOST_TRACE_COMPLETE后主动结束它启动的QEMU。修改源码后自动脚本会通过nm查目标符号，QEMU版本/源码行号变化需重新核对断点。
-
-日志为实际运行文本，没有用模拟截图替代。课程原始basic_check/best_fit_check与注入评分测试未修改。`changes/course-skeleton.patch`记录对原框架文件的改动，新算法文件可在kern/mm中查看。
-
-## 报告两版同步
-
-`lab2-report.md`是正文唯一编辑源，继续保留课程Markdown结构。`report-template/`沿用用户提供的南开模板版心、校徽、水印、封面风格，替换原编译原理示例内容。先修改Markdown，再执行`python3 tools/build_report.py --compile`生成LaTeX及PDF；Python需mistune，排版需XeLaTeX。不要直接编辑自动生成的lab2-report.tex。frontmatter.tex保存封面和摘要，若实验结论发生变化需同步核对摘要。源码顶部及markdown-sha256.txt记录正文哈希，方便检查两版是否来自同一Markdown。
+本目录保留实验源码、必要的构建与评分文件及报告。我们将学习讲解、演示材料和完整调试日志保存在本地。

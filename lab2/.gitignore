@@ -3,3 +3,19 @@ bin/
 .gdb.in
 .qemu.out
 __pycache__/
+
+# Local study materials and report authoring helpers
+/docs/
+/evidence/
+/changes/
+/prompts.md
+/SHA256SUMS.txt
+/tools/build-debug-qemu.sh
+/tools/build_report.py
+/tools/manual-host.gdb
+/tools/requirements-report.txt
+/tools/verify_*.py
+/report-template/README.md
+/report-template/frontmatter.tex
+/report-template/nku-style-preamble.tex
+/report-template/markdown-sha256.txt

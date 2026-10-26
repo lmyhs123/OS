@@ -1,4 +1,4 @@
-% Generated from lab2-report.md; SHA256=5a58716a52a0de2c041b62b767321279a37103e093b505157ae8da4290e017a6
+% Generated from lab2-report.md; SHA256=c9a00b5d09c616d69d48be8a5273c0f251bda011b2e0271c85f5ce66e74e0d70
 % -*- coding: utf-8 -*-
 % 基于所提供的南开大学实验报告模板；编译器：XeLaTeX。
 % 保留提供模板的版心、封面字体、校徽、水印和页眉页脚；正文由Markdown生成。
@@ -87,7 +87,7 @@
 \pagenumbering{Roman}
 \renewcommand{\abstractname}{\kaishu\sihao\textbf{摘要}}
 \begin{abstract}
-本实验在最小可执行内核基础上，完成物理内存探测与页描述符初始化、最佳适应页分配器、伙伴页分配器和简化对象分配器，并使用实际运行检查与课程评分验证结果。默认物理内存初始化及最佳适应分配评分为20/20；伙伴与对象分配另有独立测试。在分支任务中，我们构建独立带调试信息的QEMU，以客体GDB观察页表和控制寄存器，以宿主GDB跟踪取指及数据读取的地址翻译。实测启动映射采用顶层1GiB叶子，页表查询无需走满三级。报告区分课程提供的框架、实际修改、AI辅助过程与日志能够支持的结论。
+我们在最小可执行内核基础上，完成了物理内存探测与页描述符初始化、最佳适应页分配器、伙伴页分配器和简化对象分配器，并通过实际运行检查与课程评分验证了结果。默认物理内存初始化及最佳适应分配评分为20/20；伙伴与对象分配另有独立测试。在分支任务中，我们构建独立带调试信息的QEMU，以客体GDB观察页表和控制寄存器，以宿主GDB跟踪取指及数据读取的地址翻译。实测启动映射采用顶层1GiB叶子，页表查询无需走满三级。我们在报告中说明课程框架、实际修改、AI辅助过程和测试结论。
 \par\noindent\textbf{关键词：}物理内存；最佳适应；伙伴系统；对象分配；Sv39；QEMU调试
 \end{abstract}
 \clearpage
@@ -99,7 +99,7 @@
 
 \section*{实验基本信息与小组分工}
 
-实验日期：2026-10-23。代码来源：\href{http://oslab.mobisys.top/lab2026/labcode.html}{课程 labcode} 的 lab2.zip；未修改课程自带 Best-Fit 两个测试函数和评分测试源码。原始测试输出见 evidence 目录。
+实验日期：2026-10-23。我们使用的代码来源为：\href{http://oslab.mobisys.top/lab2026/labcode.html}{课程 labcode} 的 lab2.zip。我们保留了课程自带 Best-Fit 两个测试函数和评分测试源码，关键测试结果与调试数值记录在本报告中，完整运行日志保留在本地。
 
 
 {\small
@@ -118,7 +118,7 @@
 \end{longtable}
 }
 
-以上为本次小组模块安排。AI 作为辅助工具协助阅读、实现、排错与整理；运行结果以实际机器日志为依据，不将辅助生成的解释等同于实测。成员应按此分工理解、复现并核对负责内容。本次协作工具为 Codex，其他成员单独使用的工具与模型版本未提供，不推测填写。
+我们按以上模块组织小组分工，并使用 Codex 作为 AI 辅助工具，协助阅读框架、实现算法、定位错误和整理文档。我们以实际编译、评分和调试输出核对实验结果，并分别理解和复现所负责的内容；报告中的实现与测试结论以实际运行记录为依据。
 
 
 \section{实验目的}
@@ -133,7 +133,7 @@
 \end{enumerate}
 \section{实验环境与整体逻辑}
 
-Windows 下 VMware Ubuntu 24.04，RISC-V GCC 15.1.0、GNU make、系统 QEMU 8.2.2、OpenSBI v1.3、gdb-multiarch。另在用户目录构建 Ubuntu 源码包中的 QEMU 8.2.2 调试版；未 make install，系统模拟器保持可用。构建命令见 tools/build-debug-qemu.sh。
+我们的实验环境为 Windows 下的 VMware Ubuntu 24.04，RISC-V GCC 15.1.0、GNU make、系统 QEMU 8.2.2、OpenSBI v1.3、gdb-multiarch。我们还在个人目录中构建了 Ubuntu 源码包中的 QEMU 8.2.2 调试版，用于宿主源码调试；构建后直接运行该二进制，没有执行 make install。
 
 
 \begin{lstlisting}
@@ -143,17 +143,17 @@ QEMU 预装固件/镜像 → ROM → OpenSBI → entry.S
 → SLUB 对象测试 → 无限循环
 \end{lstlisting}
 
-内核链接 VA 起点为 0xffffffffc0200000，加载 PA 为 0x80200000，偏移量为 0xffffffff40000000。VA=PA+offset；PADDR 进行反向转换。不要将 Page *、物理地址 PA、虚拟地址 VA 和物理页号 PPN 混为同一数值。
+内核链接 VA 起点为 0xffffffffc0200000，加载 PA 为 0x80200000，偏移量为 0xffffffff40000000。VA=PA+offset；PADDR 进行反向转换。在实现和调试中，我们分别区分 Page *（描述符指针）、物理地址 PA、虚拟地址 VA 和物理页号 PPN。
 
 
-目录迁移说明（2026-10-25）：实验目录现为 \nolinkurl{/home/lmy/os/lab2}，Lab1目录为 \nolinkurl{/home/lmy/os/lab1}。工具链和独立调试版QEMU位置保持不变。演示文档已改用新路径；历史日志保留采集时的路径。
+我们的实验目录为 \nolinkurl{/home/lmy/os/lab2}，工具链位于 \nolinkurl{/home/lmy/riscv-elf-toolchains/bin}。
 
 
 \section{实验内容与实现}
 
 \subsection{物理内存初始化 page\_init}
 
-接口 \nolinkurl{static void page_init(void)} 无参数、无返回值，通过全局量 pages、npage 和 va\_pa\_offset 提供结果。
+我们实现了接口 \nolinkurl{static void page_init(void)}。该函数无参数、无返回值，通过全局量 pages、npage 和 va\_pa\_offset 提供初始化结果。
 
 
 \begin{enumerate}
@@ -170,12 +170,12 @@ QEMU 预装固件/镜像 → ROM → OpenSBI → entry.S
 \item 仅当存在完整空闲页时调用 init\_memmap。框架要求 n>0，因此没有空闲整页时不调用它。
 
 \end{enumerate}
-默认 128 MiB RAM 实测：管理区间 [0x80000000,0x88000000)，npage-nbase=32768，sizeof(Page)=40；描述符 PA=0x80207000；完整空闲页区间 [0x80347000,0x87e00000)，共 31417 页。64 MiB 实测自动缩小管理上界；256 MiB 实测按框架 0x88000000 上界裁剪。评分脚本关于 npage 的预期针对默认内存，不能把默认 20/20 推广为任意内存配置的评分结论。
+我们在默认 128 MiB RAM 下的实测结果为：管理起点为 \nolinkurl{0x80000000}，上界为 \nolinkurl{0x88000000}，npage-nbase=32768，sizeof(Page)=40；描述符 PA=0x80207000；完整空闲页区间从 \nolinkurl{0x80347000} 到 \nolinkurl{0x87e00000}（不含上界），共 31417 页。64 MiB 实测自动缩小管理上界；256 MiB 实测按框架 0x88000000 上界裁剪。评分脚本关于 npage 的预期针对默认内存，不能把默认 20/20 推广为任意内存配置的评分结论。
 
 
 \subsection{First-Fit 的理解及改进}
 
-default\_init 初始化双向链表和空闲计数；init\_memmap 将可用区间组成块，头页 property 保存块长。alloc\_pages 从链表头开始选第一块长度\ensuremath{\geq}n 的块，分割余块；free\_pages 按地址插入，并与前后物理相邻块合并。
+我们首先分析了课程提供的 First-Fit：default\_init 初始化双向链表和空闲计数；init\_memmap 将可用区间组成块，头页 property 保存块长。alloc\_pages 从链表头开始选第一块长度\ensuremath{\geq}n 的块，分割余块；free\_pages 按地址插入，并与前后物理相邻块合并。
 
 
 查找时间最坏 O(空闲块数)，地址有序链表便于合并，但不保证最小碎片。可使用分桶、平衡树、位图或最近搜索位置改善搜索成本；也可减少频繁分割。不能保证任何策略都能消除外部碎片。
@@ -183,10 +183,10 @@ default\_init 初始化双向链表和空闲计数；init\_memmap 将可用区�
 
 \subsection{Best-Fit}
 
-复用框架约定的地址有序空闲链表；遍历所有满足 property\ensuremath{\geq}n 的块，选择 property 最小者。同长时保留首先遇到的低地址块。分配后移除原头、为剩余块设置新头，减少 nr\_free；释放时插入并合并相邻空闲块。init\_pmm\_manager 默认选择 best\_fit\_pmm\_manager。
+我们实现 Best-Fit 时复用框架约定的地址有序空闲链表；遍历所有满足 property\ensuremath{\geq}n 的块，选择 property 最小者。同长时保留首先遇到的低地址块。分配后移除原头、为剩余块设置新头，减少 nr\_free；释放时插入并合并相邻空闲块。init\_pmm\_manager 默认选择 best\_fit\_pmm\_manager。
 
 
-修正了复制参考链表插入逻辑时的尾插入风险：尾部插入后必须 break，否则循环可能继续访问刚插入的节点甚至重复插入。除课程原测试外，增加32页隔离池测试：分配32个单页、耗尽返回NULL、释放偶数页形成碎片时不能分配2页、释放奇数页后重新合并成32页，最终计数恢复。
+我们修正了参考链表插入逻辑时发现的尾插入风险：在尾部插入后增加 break，避免循环继续访问刚插入的节点甚至重复插入。除课程原测试外，增加32页隔离池测试：分配32个单页、耗尽返回NULL、释放偶数页形成碎片时不能分配2页、释放奇数页后重新合并成32页，最终计数恢复。
 
 
 原 basic\_check 与 best\_fit\_check 内容保持不变；新增 best\_fit\_verify 包装调用二者之外的附加测试。普通运行和注入评分都真正使用 Best-Fit。改进可采用按长度索引的树/分桶，同时保留按地址合并结构；当前线性查找为 O(k)，仍可能制造小碎片。
@@ -194,10 +194,10 @@ default\_init 初始化双向链表和空闲计数；init\_memmap 将可用区�
 
 \subsection{Buddy System}
 
-新增 buddy\_pmm.c/h，使用0到15阶空闲链表，每阶块大小为2\textasciicircum{}order页。初始化把任意长度初始区间拆成物理页号对齐的二次幂块。申请 n 页向上取整到最小二次幂，从足够大的一阶拆分；伙伴页号由 ppn XOR (1<<order) 得到。释放仅合并同阶、真正的伙伴，不能仅凭地址相邻就合并。
+我们新增 buddy\_pmm.c/h，使用0到15阶空闲链表，每阶块大小为2\textasciicircum{}order页。初始化把任意长度初始区间拆成物理页号对齐的二次幂块。申请 n 页向上取整到最小二次幂，从足够大的一阶拆分；伙伴页号由 ppn XOR (1<<order) 得到。释放仅合并同阶、真正的伙伴，不能仅凭地址相邻就合并。
 
 
-alloc\_pages(3) 实际占4页，free\_pages 必须使用原始申请长度3，以同样的阶数释放。各阶头标记由 PageProperty 与 property 保存；available 统计实际剩余页数。构建 \nolinkurl{make PMM=buddy} 时切换管理器，切换前必须 make clean，避免复用另一配置的目标文件。
+我们的 alloc\_pages(3) 实际占4页；释放时使用原始申请长度3，使 free\_pages 按同样的阶数回收。各阶头标记由 PageProperty 与 property 保存；available 统计实际剩余页数。我们通过 \nolinkurl{make PMM=buddy} 切换管理器，并在切换前执行 make clean，避免复用另一配置的目标文件。
 
 
 测试覆盖：零长度和超最大阶请求、3页向4页取整、4页/8页对齐、并存块无重叠、释放前后计数恢复；隔离一个8页块，拆成8个单页至耗尽，逆序释放，重新申请8页必须恢复原块。这能检查分裂、伙伴合并和计数，而不仅是“申请返回非空”。
@@ -205,7 +205,7 @@ alloc\_pages(3) 实际占4页，free\_pages 必须使用原始申请长度3，�
 
 \subsection{简化 SLUB 对象分配}
 
-新增 kmalloc(size\_t n)、kfree(void *p)、slub\_check()。这是体现 SLUB 主体思想的单CPU教学实现，不等同于 Linux 生产级 SLUB。
+我们新增 kmalloc(size\_t n)、kfree(void *p)、slub\_check()。这是体现 SLUB 主体思想的单CPU教学实现，不等同于 Linux 生产级 SLUB。
 
 
 下层使用当前 pmm\_manager 的页分配；上层提供16、32、64、128、256、512、1024字节七种缓存。每个slab一页，页首为元数据，后面切分为固定长度对象；空闲对象首部存放下一个空闲对象指针。对象16字节对齐。超过1024字节走连续页大对象路径，申请页数为 ceil((header+n)/4096)，最大接受1 MiB。大对象仍保留首部元数据，使 kfree 能还原页及长度。
@@ -214,27 +214,48 @@ alloc\_pages(3) 实际占4页，free\_pages 必须使用原始申请长度3，�
 kfree(NULL) 无操作。释放小对象时检查页头、位置、对齐及重复释放，把对象放回空闲链；整slab空闲后从缓存链移除并归还底层页。Buddy 模式下底层页请求可能取整，但仍保存原请求页数，以相同请求释放。
 
 
-测试覆盖各大小类边界1/16/17/32/33/.../1024/1025、4096和9000字节，逐字节写入和核对防止重叠，逆序释放后空闲页计数恢复；300个32字节对象跨多个slab，验证数据、同一可用slab中的对象复用及所有页回收。早期测试错误假定任意slab释放的对象都是下次首选；改为释放当前优先缓存slab中的对象后检验复用，没有修改分配策略以迎合错误假设。
+测试覆盖各大小类边界1/16/17/32/33/.../1024/1025、4096和9000字节，逐字节写入和核对防止重叠，逆序释放后空闲页计数恢复；300个32字节对象跨多个slab，验证数据、同一可用slab中的对象复用及所有页回收。我们在早期测试中错误假定任意slab释放的对象都是下次首选；核对缓存链选择顺序后，我们改为释放当前优先缓存slab中的对象再检验复用。
 
 
 \subsection{任务规格与 AI 辅助过程}
 
-完整规格与复现提示词见 prompts.md，包括 page\_init、Best-Fit，以及 Buddy 和 SLUB 各自的实现/测试两份规格。实际交互以持续协作为主，文档中的结构化提示是对工作规格的整理，不伪称用户曾逐字输入这些内容。AI 协助代码实现、问题定位和文档整理，小组负责理解、核对和演示。
+我们在持续协作中使用 Codex 辅助阅读、编码、排错和解释，围绕接口、约束与验收标准组织任务。以下提示词是我们对协作需求的整理，便于复现实现和测试思路。
 
 
-实际修复包括：QEMU 通用loader缺少入口交接信息，改用-kernel；入口缺失低地址过渡映射，增加顶层第2项恒等映射；工具链明确rv64gc/lp64d并改正旧sfence.vm别名；课程脚本CRLF在sh下报错，统一LF；Best-Fit尾插入增加break；纠正SLUB复用测试前提；QEMU源码包缺少可安装BIOS资源时使用disable-install-blobs，运行时-L /usr/share/qemu复用系统固件。
+\textbf{物理页初始化与 Best-Fit。} 我们要求基于 DTB 初始化 pages、npage 和 va\_pa\_offset，检查溢出及内存边界，保留固件、内核、描述符和 DTB 占用；Best-Fit 遍历全部合适块选择最小者，保持地址有序及相邻块合并。我们保留课程 basic\_check、best\_fit\_check 与评分测试，另加耗尽、碎片和合并测试。
+
+
+\textbf{Buddy 实现提示。} “实现独立 pmm\_manager：0到15阶，每块为2\textasciicircum{}order页；初始化按绝对物理页号对齐分解区间；申请向上取整并逐阶拆分，释放按 ppn XOR (1<<order) 寻找同阶伙伴并递归合并。支持 PMM=buddy，明确原始申请长度的释放约定。”
+
+
+\textbf{Buddy 测试提示。} “覆盖零与过大请求、3页申请实际占4页、对齐和不重叠；隔离8页，拆成8个单页至耗尽，逆序释放后重新申请完整8页，恢复原状态并核对空闲计数。”
+
+
+\textbf{SLUB 实现提示。} “在页分配器上实现 kmalloc/kfree，提供16到1024字节七种缓存，每slab一页、对象16字节对齐、空闲对象内嵌next指针；大对象以带头部的连续页分配，限制1MiB，完全空闲时归还页，兼容Best-Fit和Buddy。”
+
+
+\textbf{SLUB 测试提示。} “覆盖大小类边界、零与过大请求、跨页大对象；逐字节检查数据，300个32字节对象跨多个slab，检查当前可用slab内的对象复用，全部释放后核对底层页数，在两种页分配器下分别运行。”
+
+
+\textbf{QEMU 调试提示。} “在个人目录构建带符号的QEMU，用宿主GDB运行模拟器，客体GDB连接stub；分别观察kern\_init取指和boot\_dtb数据读，检查TLB miss、页表项读取与最终物理地址，排除is\_debug访问，并对照Bare与Sv39。”
+
+
+我们通过实际构建与运行核对 AI 辅助生成的代码，发现不符合框架或测试前提的内容后继续修改；测试结果以第五节的实际验证范围为准。
+
+
+我们在实验中实际修复的问题包括：QEMU 通用loader缺少入口交接信息，改用-kernel；入口缺失低地址过渡映射，增加顶层第2项恒等映射；工具链明确rv64gc/lp64d并改正旧sfence.vm别名；课程脚本CRLF在sh下报错，统一LF；Best-Fit尾插入增加break；纠正SLUB复用测试前提；QEMU源码包缺少可安装BIOS资源时使用disable-install-blobs，运行时-L /usr/share/qemu复用系统固件。
 
 
 \section{分支任务：实际调试 QEMU 的 MMU 路径}
 
 \subsection{调试架构}
 
-客体 gdb-multiarch 经 QEMU stub 观察 RISC-V 寄存器和内核；宿主普通 gdb 运行 x86-64 的 QEMU 进程，断点落在其C源码。宿主GDB作为QEMU父进程，不需要sudo attach，也避免ptrace限制。QEMU调试版位于 /home/lmy/oslab-tools/qemu-ubuntu-build/qemu-system-riscv64，源码在相邻qemu-source。具体复现脚本见 tools/verify\_guest.py、tools/verify\_host.py，交互命令见 docs/演示命令.md。
+我们用客体 gdb-multiarch 经 QEMU stub 观察 RISC-V 寄存器和内核，用宿主普通 gdb 运行 x86-64 的 QEMU 进程，并在其C源码中设置断点。宿主GDB作为QEMU父进程，不需要sudo attach，也避免ptrace限制。QEMU调试版位于 /home/lmy/oslab-tools/qemu-ubuntu-build/qemu-system-riscv64，源码在相邻qemu-source。我们分别检查了内核启动、页表设置、取指和数据读取的翻译路径。
 
 
 \subsection{SATP 与大页的客体观察}
 
-实测 SATP=0x8000000000080205：MODE=8表示Sv39，ASID=0，根表PPN=0x80205，即物理地址0x80205000。根表第511项位于0x80205ff8，PTE=0x200000cf；恒等映射第2项也为相同PTE。
+我们在客体 GDB 中读到 SATP=0x8000000000080205：MODE=8表示Sv39，ASID=0，根表PPN=0x80205，即物理地址0x80205000。根表第511项位于0x80205ff8，PTE=0x200000cf；恒等映射第2项也为相同PTE。
 
 
 PTE的PPN=0x80000，对应PA基址0x80000000；低位0xcf表示V/R/W/X/A/D为1、U/G为0。根表叶子映射1 GiB。三级页表是最多三级查询，遇到叶子可提前结束。本实验两项覆盖低地址0x80000000起1 GiB，以及高地址0xffffffffc0000000起1 GiB。真实受管RAM只有其中一部分，大页映射范围不等于可分配RAM范围。
@@ -242,10 +263,10 @@ PTE的PPN=0x80000，对应PA基址0x80000000；低位0xcf表示V/R/W/X/A/D为1�
 
 \subsection{宿主断点与真实翻译}
 
-选择既会取指的kern\_init，又会读取数据的boot\_dtb做两次独立运行。宿主条件断点位于 riscv\_cpu\_tlb\_fill、get\_physical\_address、PTE读取后的分支和tlb\_set\_page前。is\_debug=0用于排除调试器自身的内存查询。
+我们分别选择 kern\_init 的取指和 boot\_dtb 的数据读取做两次独立运行。宿主条件断点位于 riscv\_cpu\_tlb\_fill、get\_physical\_address、PTE读取后的分支和tlb\_set\_page前。is\_debug=0用于排除调试器自身的内存查询。
 
 
-实测关键行（完整输出见 evidence/host-console.log 与 host-data-console.log）：
+我们记录到以下关键输出：
 
 
 \begin{lstlisting}
@@ -274,29 +295,29 @@ QEMU 8.2的 target/riscv/cpu\_helper.c 中 get\_physical\_address 先检查权�
 QEMU软件TLB承担客体地址转换及访问权限缓存，并保存加速宿主访问需要的信息；它不等于实体RISC-V处理器某一型号的硬件TLB，也不等于宿主x86 CPU自己的TLB。本次大页翻译虽然使用1 GiB叶子，软件缓存填充实测cached\_size为0x1000，不能把二者混为相同页大小。进入内核前Bare模式虽然不做Sv39遍历，QEMU仍可能调用软件TLB填充，这正是日志中SATP=0时也有TLB\_MISS的原因。
 
 
-\section{测试与证据}
+\section{测试结果}
 
 {\small
 \setlength{\tabcolsep}{3pt}
 \renewcommand{\arraystretch}{1.22}
 \begin{longtable}{>{\raggedright\arraybackslash}p{0.25\linewidth}>{\raggedright\arraybackslash}p{0.29\linewidth}>{\raggedright\arraybackslash}p{0.37\linewidth}}
 \toprule
-测试 & 实测结果 & 日志 \\
+测试 & 实测结果 & 验证内容 \\
 \midrule\endfirsthead
-测试 & 实测结果 & 日志 \\
+测试 & 实测结果 & 验证内容 \\
 \midrule\endhead
-课程 page\_init 与 Best-Fit 评分 & 20/20 & evidence/grade.log \\
-Best-Fit原测试与附加32页碎片/合并 & PASS & evidence/best-fit-run.log \\
-Buddy取整/对齐/耗尽/合并 & PASS & evidence/buddy-run.log \\
-SLUB尺寸边界/数据/多slab/复用/回收 & Best-Fit、Buddy两种下层均PASS & 两种运行日志 \\
-64MiB、256MiB启动与内存边界 & 启动及测试成功，256MiB按上界裁剪 & evidence/memory-64M.log、memory-256M.log \\
-客体GDB与SATP/PTE & 高地址断点及根表值已确认 & evidence/guest-gdb.log \\
-宿主QEMU取指与数据读翻译 & 条件断点命中并确认PA & evidence/host-console.log、host-data-console.log \\
+课程 page\_init 与 Best-Fit 评分 & 20/20 & 默认128MiB配置下的课程评分 \\
+Best-Fit原测试与附加32页碎片/合并 & PASS & 耗尽、连续性、释放后合并和计数恢复 \\
+Buddy取整/对齐/耗尽/合并 & PASS & 非二次幂申请、拆分及伙伴回收 \\
+SLUB尺寸边界/数据/多slab/复用/回收 & Best-Fit、Buddy两种下层均PASS & 数据不重叠、对象复用、底层页归还 \\
+64MiB、256MiB启动与内存边界 & 启动及测试成功 & 64MiB自动缩小，256MiB按128MiB上界裁剪 \\
+客体GDB与SATP/PTE & 高地址断点及根表值已确认 & SATP=0x8000000000080205，PTE=0x200000cf \\
+宿主QEMU取指与数据读翻译 & 条件断点命中并确认PA & 分别得到PA=0x802000d6与0x80206008 \\
 \bottomrule
 \end{longtable}
 }
 
-日志中的timeout终止来自限时验证；HOST\_TRACE\_COMPLETE后的killed来自调试脚本主动结束QEMU，均不是内核崩溃。仅声称以上实际覆盖，不声称生产级并发、任意恶意DTB或全部硬件配置均通过。未制作模拟截图，保留真实文本日志供核查与现场演示。
+我们在限时验证中使用 timeout 结束运行，在宿主跟踪完成后由调试脚本主动结束 QEMU，因此相应的 timeout 和 killed 信息属于验证流程结束。我们在本地保留了真实文本日志；测试范围为上表所列场景，尚未覆盖生产级并发、任意恶意 DTB 和全部硬件配置。
 
 
 \section{总结、理论联系与扩展思考}
@@ -307,24 +328,24 @@ SLUB尺寸边界/数据/多slab/复用/回收 & Best-Fit、Buddy两种下层均P
 未知硬件RAM范围可通过DTB、UEFI内存映射或平台固件协议获取，并结合保留区域及硬件窗口；本框架DTB解析只识别一个memory节点的reg，不应盲探任意物理地址，也不宣称支持多段RAM和完整reserved-memory语义。未来可扩展多个物理区间、FDT保留表与启动参数保留区。
 
 
-本实验尚未实现进程地址空间隔离、按需分页、页面置换、系统调用、调度、文件系统，以及多核/中断环境下的分配器同步。过渡恒等映射和宽权限1GiB启动页适合教学启动，不是最终内核应长期采用的最小权限布局。
+我们本次尚未实现进程地址空间隔离、按需分页、页面置换、系统调用、调度、文件系统，以及多核/中断环境下的分配器同步。过渡恒等映射和宽权限1GiB启动页适合教学启动，不是最终内核应长期采用的最小权限布局。
 
 
-本次实验证明了可管理物理页建立、Best-Fit接入、Buddy和对象分配，以及QEMU中真实地址转换的关键路径。答辩命令、参数解释和追问见docs目录。
+通过本次实验，我们完成了可管理物理页的建立、Best-Fit接入、Buddy和对象分配，并在QEMU源码中观察了真实地址转换的关键路径。
 
 
-参考：\href{http://8.135.34.58/lab2026/_book/lab2/lab2_2_1_exercise.html}{课程练习}、\href{http://8.135.34.58/lab2026/_book/lab2/lab2_4_qemu_mmu_debug.html}{分支任务}、\href{https://github.com/qemu/qemu/blob/v8.2.2/target/riscv/cpu_helper.c}{QEMU v8.2.2 MMU源码}、\href{https://github.com/qemu/qemu/blob/v8.2.2/accel/tcg/cputlb.c}{QEMU软件TLB}。实测采用Ubuntu重打包的8.2.2源码，源代码摘录和行号存放于evidence。
+参考：\href{http://8.135.34.58/lab2026/_book/lab2/lab2_2_1_exercise.html}{课程练习}、\href{http://8.135.34.58/lab2026/_book/lab2/lab2_4_qemu_mmu_debug.html}{分支任务}、\href{https://github.com/qemu/qemu/blob/v8.2.2/target/riscv/cpu_helper.c}{QEMU v8.2.2 MMU源码}、\href{https://github.com/qemu/qemu/blob/v8.2.2/accel/tcg/cputlb.c}{QEMU软件TLB}。我们实际调试时采用Ubuntu重打包的8.2.2源码。
 
 
-\section{答辩核查补充（2026-10-26）}
+\section{关键代码的调试验证}
 
-依据同学反馈，补充实际\nolinkurl{make gdb}入口及算法区别的断点观察。\nolinkurl{make gdb}内部调用工具链GDB加载符号、设置RISC-V架构并连接1234端口；实测SATP和PTE与前述日志一致，记录见evidence/make-gdb.log。
-
-
-在best\_fit\_check第237行申请1页之前，GDB确认两个空闲块相对p0偏移分别为1和4，长度分别为2和1，总空闲3页；执行该行后p1-p0=4、剩余2页。因此第239行assert(p0 + 4 == p1)明确验证最小合适块选择，与First-Fit的首次合适块选择不同。描述符大小40字节、page\_link偏移24字节也经GDB确认，原始记录见evidence/defense-gdb.log。
+我们进一步通过实际\nolinkurl{make gdb}入口检查启动状态，并用断点观察分配算法的区别。\nolinkurl{make gdb}内部调用工具链GDB加载符号、设置RISC-V架构并连接1234端口；我们读到的SATP和PTE与前述数值一致。
 
 
-Page管理标记不是PTE硬件权限；单张Sv39表为4KiB、512项，而完整多级结构按实际映射分配；启动根表使用1GiB叶子所以不走满三级。测试断言属于覆盖特定行为的证据，不能代替任意非法释放或并发正确性的证明。按源码逐行准备的专项问答见docs/助教实问专项逐行答辩.md。
+我们在best\_fit\_check第237行申请1页之前，通过GDB确认两个空闲块相对p0偏移分别为1和4，长度分别为2和1，总空闲3页；执行该行后p1-p0=4、剩余2页。因此第239行assert(p0 + 4 == p1)明确验证最小合适块选择，与First-Fit的首次合适块选择不同。我们还通过GDB确认描述符大小为40字节，page\_link偏移为24字节。
+
+
+Page管理标记不是PTE硬件权限；单张Sv39表为4KiB、512项，而完整多级结构按实际映射分配；启动根表使用1GiB叶子所以不走满三级。测试断言属于覆盖特定行为的证据，不能代替任意非法释放或并发正确性的证明。这些观察帮助我们把分配策略、链表结构和实际执行结果对应起来。
 
 
 \end{document}
