@@ -4,6 +4,7 @@
 #define MAX_ORDER 15
 static list_entry_t bins[MAX_ORDER + 1];
 static size_t available;
+static void buddy_reserved_check(void);
 static unsigned order_for(size_t n) {
     unsigned o = 0;
     while (((size_t)1 << o) < n && o <= MAX_ORDER) o++;
@@ -91,6 +92,7 @@ static void buddy_check(void) {
     for (unsigned o=0;o<=MAX_ORDER;o++) bins[o]=saved[o];
     available=saved_n; buddy_free(block,8);
     assert(available==before);
+    buddy_reserved_check();
     cprintf("[Buddy] rounding/alignment/non-overlap/exhaustion/coalescing: PASS\n");
 }
 const struct pmm_manager buddy_pmm_manager={
@@ -98,3 +100,63 @@ const struct pmm_manager buddy_pmm_manager={
  .alloc_pages=buddy_alloc, .free_pages=buddy_free,
  .nr_free_pages=buddy_count, .check=buddy_check,
 };
+
+/* A reserved hole must remain unavailable until explicitly returned. */
+static void buddy_reserved_check(void) {
+    size_t before = available;
+    struct Page *block = buddy_alloc(16);
+    assert(block && (page2ppn(block) & 15) == 0);
+    list_entry_t saved[MAX_ORDER + 1];
+    size_t saved_n = available;
+    for (unsigned o = 0; o <= MAX_ORDER; o++) {
+        saved[o] = bins[o];
+        list_init(&bins[o]);
+    }
+    available = 0;
+    for (size_t i = 0; i < 16; i++) {
+        block[i].flags = 0;
+        block[i].property = 0;
+        set_page_ref(block + i, 0);
+    }
+    SetPageReserved(block + 7);
+    for (size_t i = 0; i < 16; i++) {
+        if (i != 7) buddy_free(block + i, 1);
+    }
+    assert(available == 15 && PageReserved(block + 7));
+    cprintf("[Buddy16] reserved=1 free=%lu\n", available);
+
+    struct Page *v[15];
+    for (size_t i = 0; i < 15; i++) {
+        v[i] = buddy_alloc(1);
+        assert(v[i] && v[i] >= block && v[i] < block + 16);
+        assert(v[i] != block + 7 && !PageReserved(v[i]));
+        for (size_t j = 0; j < i; j++) assert(v[i] != v[j]);
+    }
+    assert(available == 0 && buddy_alloc(1) == NULL);
+    cprintf("[Buddy16] exhausted free=%lu\n", available);
+
+    for (int i = 14; i >= 0; i--) buddy_free(v[i], 1);
+    assert(available == 15 && PageReserved(block + 7));
+    ClearPageReserved(block + 7);
+    buddy_free(block + 7, 1);
+    assert(available == 16 && PageProperty(block) && block->property == 4);
+    cprintf("[Buddy16] unreserved free=%lu\n", available);
+
+    struct Page *three = buddy_alloc(3);
+    struct Page *five = buddy_alloc(5);
+    assert(three && five && three->property == 2 && five->property == 3);
+    assert(three + 4 <= five || five + 8 <= three);
+    assert(available == 4);
+    cprintf("[Buddy16] alloc(3)=4 alloc(5)=8 free=%lu\n", available);
+    buddy_free(three, 3);
+    buddy_free(five, 5);
+    assert(available == 16 && PageProperty(block) && block->property == 4);
+    cprintf("[Buddy16] restored=%lu\n", available);
+    assert(buddy_alloc(16) == block && available == 0);
+
+    for (unsigned o = 0; o <= MAX_ORDER; o++) bins[o] = saved[o];
+    available = saved_n;
+    buddy_free(block, 16);
+    assert(available == before);
+    cprintf("[Buddy16] reservation/non-duplicate/rounding/full-merge: PASS\n");
+}

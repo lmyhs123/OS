@@ -36,6 +36,8 @@ CFLAGS	+= -fno-stack-protector -ffunction-sections -fdata-sections
 CFLAGS	+= -g -march=rv64gc -mabi=lp64d
 ifeq ($(PMM),buddy)
 CFLAGS += -DPMM_BUDDY
+else ifeq ($(PMM),first)
+CFLAGS += -DPMM_FIRST
 endif
 CFLAGS2 = $(CFLAGS) -D ucore_test
 CTYPE	:= c S
