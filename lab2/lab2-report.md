@@ -150,3 +150,11 @@ QEMU软件TLB承担客体地址转换及访问权限缓存，并保存加速宿�
 本次实验证明了可管理物理页建立、Best-Fit接入、Buddy和对象分配，以及QEMU中真实地址转换的关键路径。答辩命令、参数解释和追问见docs目录。
 
 参考：[课程练习](http://8.135.34.58/lab2026/_book/lab2/lab2_2_1_exercise.html)、[分支任务](http://8.135.34.58/lab2026/_book/lab2/lab2_4_qemu_mmu_debug.html)、[QEMU v8.2.2 MMU源码](https://github.com/qemu/qemu/blob/v8.2.2/target/riscv/cpu_helper.c)、[QEMU软件TLB](https://github.com/qemu/qemu/blob/v8.2.2/accel/tcg/cputlb.c)。实测采用Ubuntu重打包的8.2.2源码，源代码摘录和行号存放于evidence。
+
+## 七、答辩核查补充（2026-10-26）
+
+依据同学反馈，补充实际`make gdb`入口及算法区别的断点观察。`make gdb`内部调用工具链GDB加载符号、设置RISC-V架构并连接1234端口；实测SATP和PTE与前述日志一致，记录见evidence/make-gdb.log。
+
+在best_fit_check第237行申请1页之前，GDB确认两个空闲块相对p0偏移分别为1和4，长度分别为2和1，总空闲3页；执行该行后p1-p0=4、剩余2页。因此第239行assert(p0 + 4 == p1)明确验证最小合适块选择，与First-Fit的首次合适块选择不同。描述符大小40字节、page_link偏移24字节也经GDB确认，原始记录见evidence/defense-gdb.log。
+
+Page管理标记不是PTE硬件权限；单张Sv39表为4KiB、512项，而完整多级结构按实际映射分配；启动根表使用1GiB叶子所以不走满三级。测试断言属于覆盖特定行为的证据，不能代替任意非法释放或并发正确性的证明。按源码逐行准备的专项问答见docs/助教实问专项逐行答辩.md。

@@ -1,4 +1,4 @@
-% Generated from lab2-report.md; SHA256=a8fae69e66c523dc3223343b7ca3e15e4f263a85aeefe3682e0fcbd5f3b66f48
+% Generated from lab2-report.md; SHA256=5a58716a52a0de2c041b62b767321279a37103e093b505157ae8da4290e017a6
 % -*- coding: utf-8 -*-
 % 基于所提供的南开大学实验报告模板；编译器：XeLaTeX。
 % 保留提供模板的版心、封面字体、校徽、水印和页眉页脚；正文由Markdown生成。
@@ -314,6 +314,17 @@ SLUB尺寸边界/数据/多slab/复用/回收 & Best-Fit、Buddy两种下层均P
 
 
 参考：\href{http://8.135.34.58/lab2026/_book/lab2/lab2_2_1_exercise.html}{课程练习}、\href{http://8.135.34.58/lab2026/_book/lab2/lab2_4_qemu_mmu_debug.html}{分支任务}、\href{https://github.com/qemu/qemu/blob/v8.2.2/target/riscv/cpu_helper.c}{QEMU v8.2.2 MMU源码}、\href{https://github.com/qemu/qemu/blob/v8.2.2/accel/tcg/cputlb.c}{QEMU软件TLB}。实测采用Ubuntu重打包的8.2.2源码，源代码摘录和行号存放于evidence。
+
+
+\section{答辩核查补充（2026-10-26）}
+
+依据同学反馈，补充实际\nolinkurl{make gdb}入口及算法区别的断点观察。\nolinkurl{make gdb}内部调用工具链GDB加载符号、设置RISC-V架构并连接1234端口；实测SATP和PTE与前述日志一致，记录见evidence/make-gdb.log。
+
+
+在best\_fit\_check第237行申请1页之前，GDB确认两个空闲块相对p0偏移分别为1和4，长度分别为2和1，总空闲3页；执行该行后p1-p0=4、剩余2页。因此第239行assert(p0 + 4 == p1)明确验证最小合适块选择，与First-Fit的首次合适块选择不同。描述符大小40字节、page\_link偏移24字节也经GDB确认，原始记录见evidence/defense-gdb.log。
+
+
+Page管理标记不是PTE硬件权限；单张Sv39表为4KiB、512项，而完整多级结构按实际映射分配；启动根表使用1GiB叶子所以不走满三级。测试断言属于覆盖特定行为的证据，不能代替任意非法释放或并发正确性的证明。按源码逐行准备的专项问答见docs/助教实问专项逐行答辩.md。
 
 
 \end{document}

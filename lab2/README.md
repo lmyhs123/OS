@@ -8,6 +8,7 @@
 - [全部术语词典](./docs/术语词典.md)
 - [演示命令与参数解释](./docs/演示命令.md)
 - [从零原理解释和助教追问](./docs/原理详解与答辩追问.md)
+- [助教实问专项：源码定位与逐行演示](./docs/助教实问专项逐行答辩.md)
 - [任务规格与辅助提示词](./prompts.md)
 - [课程评分输出](./evidence/grade.log)
 - [QEMU取指翻译记录](./evidence/host-console.log)
