@@ -1,0 +1,13 @@
+obj/
+bin/
+.qemu*
+.gdb*
+evidence/
+tools/build_report.py
+report-template/*.aux
+report-template/*.log
+report-template/*.toc
+report-template/*.out
+report-template/frontmatter.tex
+report-template/nku-style-preamble.tex
+report-template/markdown-sha256.txt
