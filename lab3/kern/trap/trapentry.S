@@ -2,6 +2,9 @@
 /* Modern assembler name for the same CSR; SAVE_ALL layout is unchanged. */
 #define sbadaddr stval
 
+    # 保存被打断时的现场：先暂存原 sp，再在内核栈上腾出 288 字节。
+    # 将通用寄存器及 sstatus、sepc、stval、scause 保存为 trapframe，
+    # 使处理函数可以使用寄存器，并保留原程序继续执行所需的状态。
     .macro SAVE_ALL
 
     csrw sscratch, sp
@@ -56,6 +59,9 @@
     STORE s4, 35*REGBYTES(sp)
     .endm
 
+    # 恢复处理后的现场：先恢复 sstatus、sepc，再恢复通用寄存器。
+    # 异常处理函数可能已调整 frame 中的 epc，以便跳过触发异常的指令。
+    # 最后恢复 sp，保证此前始终能通过当前栈指针定位 frame 中的字段。
     .macro RESTORE_ALL
 
     #lab3 function1 2411080
@@ -99,6 +105,8 @@
 
     .globl __alltraps
     .align(2)
+    # 中断和异常的统一入口：保存现场后，将 frame 地址通过 a0 传给 trap()。
+    # C 函数完成分类和处理后返回这里，接着进入下方的现场恢复流程。
 __alltraps:
     SAVE_ALL
 
@@ -108,6 +116,8 @@ __alltraps:
     # sp should be the same as before "jal trap"
 
     .globl __trapret
+    # 返回原执行流：恢复现场后执行 sret，从 sepc 指定的位置继续执行。
+    # sret 根据 sstatus 恢复权限级别和中断使能，本实验通常返回 S 态内核。
 __trapret:
     RESTORE_ALL
     # return from supervisor call
