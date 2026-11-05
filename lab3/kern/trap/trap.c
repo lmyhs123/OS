@@ -85,6 +85,9 @@ void print_regs(struct pushregs *gpr) {
 #ifndef SHUTDOWN_AFTER
 #define SHUTDOWN_AFTER 10
 #endif
+// 处理中断：去掉 cause 的最高位后，按原因编号选择处理分支。
+// 时钟中断每次重设下一事件并累加 ticks，每 100 次输出一次，达到配置次数后关机。
+// 其他中断输出类型提示，未知中断输出原因和完整现场，供定位问题。
 void interrupt_handler(struct trapframe *tf) {
     uintptr_t cause = tf->cause & ~((uintptr_t)1 << 63);
     switch (cause) {
@@ -112,6 +115,9 @@ void interrupt_handler(struct trapframe *tf) {
         print_trapframe(tf);
     }
 }
+// 处理异常：识别非法指令和断点，输出异常地址，并按指令长度推进 frame 中的 epc。
+// 16 位指令跳过 2 字节，32 位指令跳过 4 字节，使返回后能够继续执行。
+// 更长编码报告不支持，其他异常打印现场，由现有框架提供诊断信息。
 void exception_handler(struct trapframe *tf) {
     switch (tf->cause) {
     case CAUSE_ILLEGAL_INSTRUCTION:
@@ -129,6 +135,8 @@ void exception_handler(struct trapframe *tf) {
 
 
 
+// 分发 Trap：cause 最高位为 1 表示中断，为 0 表示异常。
+// 转为有符号整数后可通过正负判断，再将同一份现场交给对应处理函数。
 static inline void trap_dispatch(struct trapframe *tf) {
     if ((intptr_t)tf->cause < 0) {
         // interrupts
@@ -139,12 +147,8 @@ static inline void trap_dispatch(struct trapframe *tf) {
     }
 }
 
-/* *
- * trap - handles or dispatches an exception/interrupt. if and when trap()
- * returns,
- * the code in kern/trap/trapentry.S restores the old CPU state saved in the
- * trapframe and then uses the iret instruction to return from the exception.
- * */
+// C 语言统一入口：接收汇编通过 a0 传来的 trapframe 指针，调用分发函数处理事件。
+// 处理函数可修改保存的返回位置等状态；返回汇编后按更新的现场恢复并执行 sret。
 void trap(struct trapframe *tf) {
     // dispatch based on what type of trap occurred
     trap_dispatch(tf);
